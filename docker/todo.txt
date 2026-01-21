@@ -1,0 +1,16 @@
+---
+The Language Server Protocol (LSP) defines the protocol used between an editor or IDE and a language server that provides language features like auto complete, go to definition, find all references etc. The protocol defines the format of the messages sent using JSON-RPC between the development tool and the language server¹.
+
+To find cross-references (xref) for a specific symbol, an LSP client can use the following messages:
+- `textDocument/references`: Finds all references to a symbol within a file or across files.
+- `textDocument/definition`: Finds the definition of a symbol.
+- `textDocument/declaration`: Finds the declaration of a symbol.
+- `textDocument/typeDefinition`: Finds the type definition of a symbol.
+- `textDocument/implementation`: Finds all implementations of a symbol¹.
+
+I hope that helps!
+
+Source: Conversation with Bing, 8/14/2023
+(1) Official page for Language Server Protocol. https://microsoft.github.io/language-server-protocol/.
+(2) Language Server Protocol Specification - 3.17 - GitHub Pages. https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/.
+(3) Language Server Protocol Specification - 3.15 - GitHub Pages. https://microsoft.github.io/language-server-protocol/specifications/specification-3-15/.

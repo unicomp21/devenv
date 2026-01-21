@@ -1,0 +1,103 @@
+x-common-vars: &common-vars
+  OPENAI_API_KEY: ""
+  OPENAI_API_ENDPOINT: ""
+  NATS_ENDPOINT: "nats://nats:4222"
+  NATS_JS_ENDPOINT: "nats://nats:4222"
+  NATS_WS_ENDPOINT: "ws://nats-ws:8081"
+  REDIS_ENDPOINT: "redis://devenv-redis-1:6379"
+
+services:
+  devenv:
+    image: devenv:latest  # Use the locally built image
+    environment:
+      <<: *common-vars
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-""}
+      OPENAI_API_ENDPOINT: ${OPENAI_API_ENDPOINT:-""}
+      NATS_ENDPOINT: ${NATS_ENDPOINT:-"nats://nats:4222"}
+      NATS_JS_ENDPOINT: ${NATS_JS_ENDPOINT:-"nats://nats:4222"}
+      NATS_WS_ENDPOINT: ${NATS_WS_ENDPOINT:-"ws://nats-ws:8081"}
+      REDIS_ENDPOINT: ${REDIS_ENDPOINT:-"redis://devenv-redis-1:6379"}
+    ports:
+      - "2222:22"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /data:/data
+      - ../..:/mono-root
+      - ~/.ssh:/tmp/.ssh:ro
+      - /dev/net/tun:/dev/net/tun
+      - /dev/net:/dev/net
+    user: "root:root"
+    ulimits:
+      memlock: -1
+      nofile: 65536
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_RESOURCE
+      - IPC_LOCK
+      - SYS_ADMIN
+      - NET_BROADCAST
+      - SYS_NICE
+    entrypoint: |
+      /bin/bash -c "/usr/local/bin/setup-ssh.sh && /usr/local/bin/entrypoint.sh"
+    restart: always
+    networks:
+      - devenv-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # redis:
+  #   image: redis:latest
+  #   restart: always
+  #   networks:
+  #     - devenv-network
+
+  # redpanda:
+  #   image: docker.redpanda.com/redpandadata/redpanda:latest
+  #   command:
+  #     - redpanda
+  #     - start
+  #     - --smp
+  #     - '1'
+  #     - --overprovisioned
+  #     - --node-id
+  #     - '0'
+  #     - --kafka-addr
+  #     - PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+  #     - --advertise-kafka-addr
+  #     - PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
+  #     - --pandaproxy-addr
+  #     - PLAINTEXT://0.0.0.0:8084,OUTSIDE://0.0.0.0:8085
+  #     - --advertise-pandaproxy-addr
+  #     - PLAINTEXT://redpanda:8084,OUTSIDE://localhost:8085
+  #   ports:
+  #     - "8084:8084"
+  #     - "8085:8085"
+  #     - "9092:9092"
+  #     - "29092:29092"
+  #   volumes:
+  #     - redpanda-data:/var/lib/redpanda/data
+  #   restart: always
+  #   networks:
+  #     - devenv-network
+
+  # nats:
+  #   image: nats:latest
+  #   ports:
+  #     - "4222:4222"
+  #     - "8222:8222"
+  #   command: ["--jetstream"]
+  #   volumes:
+  #     - nats-data:/data
+  #   restart: always
+  #   networks:
+  #     - devenv-network
+
+# volumes:
+#   nats-data:
+#   redpanda-data:
+
+networks:
+  devenv-network:
+    driver: bridge 
