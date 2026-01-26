@@ -15,6 +15,7 @@ if [[ $# -eq 0 ]]; then
     echo "  ./lima shell      - Connect to VM shell"
     echo "  ./lima status     - Show VM status"
     echo "  ./lima delete     - Delete the VM"
+    echo "  ./lima purge      - Stop and delete all VMs, remove LIMA_HOME"
     echo "  ./lima <cmd>      - Run any limactl command"
     exit 0
 fi
@@ -39,6 +40,25 @@ case "$command" in
     delete)
         echo "Deleting Lima VM..."
         limactl delete --force default
+        ;;
+    purge)
+        echo "Purging all Lima VMs from: $LIMA_HOME"
+        vms=$(limactl list --format '{{.Name}}' 2>/dev/null)
+        if [[ -n "$vms" ]]; then
+            for vm in $vms; do
+                echo "Stopping VM: $vm"
+                limactl stop "$vm" 2>/dev/null
+                echo "Deleting VM: $vm"
+                limactl delete --force "$vm"
+            done
+        else
+            echo "No VMs found."
+        fi
+        if [[ -d "$LIMA_HOME" ]]; then
+            echo "Removing LIMA_HOME directory..."
+            rm -rf "$LIMA_HOME"
+        fi
+        echo "Purge complete!"
         ;;
     *)
         # Pass through any other limactl commands
