@@ -1,2 +1,47 @@
-#!/usr/bin/env -S deno run --allow-all
-import "./lima.ts"; 
+#!/usr/bin/env bash
+
+# Lima VM management script
+
+# Set LIMA_HOME to VM directory for all persistence concerns
+export LIMA_HOME="/Volumes/MacOS/Lima/VM"
+
+if [[ $# -eq 0 ]]; then
+    echo "Lima VM Manager"
+    echo "LIMA_HOME: $LIMA_HOME"
+    echo ""
+    echo "Usage:"
+    echo "  ./lima start      - Start the VM"
+    echo "  ./lima stop       - Stop the VM"
+    echo "  ./lima shell      - Connect to VM shell"
+    echo "  ./lima status     - Show VM status"
+    echo "  ./lima delete     - Delete the VM"
+    echo "  ./lima <cmd>      - Run any limactl command"
+    exit 0
+fi
+
+command="$1"
+
+case "$command" in
+    start)
+        echo "Starting Lima VM..."
+        limactl start default
+        ;;
+    stop)
+        echo "Stopping Lima VM..."
+        limactl stop default
+        ;;
+    shell)
+        limactl shell default
+        ;;
+    status)
+        limactl list
+        ;;
+    delete)
+        echo "Deleting Lima VM..."
+        limactl delete --force default
+        ;;
+    *)
+        # Pass through any other limactl commands
+        limactl "$@"
+        ;;
+esac
