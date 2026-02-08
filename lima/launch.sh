@@ -67,8 +67,8 @@ mountType: "virtiofs"
 mounts:
   - location: "~"
     writable: true
-  - location: "/Users/jdavis/repo"
-    mountPoint: "/Users/jdavis/repo"
+  - location: "/Users/$USER_NAME/repo"
+    mountPoint: "/Users/$USER_NAME/repo"
     writable: true
   - location: "$DATA_DIR"
     mountPoint: "/data"
