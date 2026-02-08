@@ -32,6 +32,26 @@ fi
 HOST_ARCH=$(uname -m)
 echo "Host architecture: $HOST_ARCH"
 
+# Ask for directory to mount as /data in the VM
+DEFAULT_DATA_DIR="/Volumes/MacOS/data"
+read -r -p "Directory to mount as /data in VM [$DEFAULT_DATA_DIR]: " DATA_DIR
+DATA_DIR="${DATA_DIR:-$DEFAULT_DATA_DIR}"
+
+# Validate the directory exists
+if [ ! -d "$DATA_DIR" ]; then
+    read -r -p "$DATA_DIR does not exist. Create it? [Y/n]: " CREATE_DIR
+    CREATE_DIR="${CREATE_DIR:-Y}"
+    if [[ "$CREATE_DIR" =~ ^[Yy] ]]; then
+        mkdir -p "$DATA_DIR"
+        echo "Created $DATA_DIR"
+    else
+        echo "Directory $DATA_DIR does not exist. Aborting."
+        exit 1
+    fi
+fi
+
+echo "Mounting $DATA_DIR as /data in VM"
+
 # Generate lima.yaml dynamically with current user and add sudo privileges
 cat > "$SCRIPT_DIR/lima.generated.yaml" <<EOF
 vmType: "vz"
@@ -50,7 +70,7 @@ mounts:
   - location: "/Users/jdavis/repo"
     mountPoint: "/Users/jdavis/repo"
     writable: true
-  - location: "/Volumes/MacOS/data"
+  - location: "$DATA_DIR"
     mountPoint: "/data"
     writable: true
   - location: "/Volumes"
