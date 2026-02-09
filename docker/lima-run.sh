@@ -75,11 +75,35 @@ else
     fi
 fi
 
-# Step 2: Stop any existing containers
+# Step 2: Prompt for /data mount directory
+default_data_dir="/data"
+read -p "Enter host directory to mount as /data in container [$default_data_dir]: " data_dir
+data_dir="${data_dir:-$default_data_dir}"
+
+# Expand ~ to home directory
+data_dir="${data_dir/#\~/$HOME}"
+
+if [[ ! -d "$data_dir" ]]; then
+    print_warning "Directory '$data_dir' does not exist."
+    read -p "Create it? (Y/n): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        mkdir -p "$data_dir"
+        print_status "Created directory '$data_dir'"
+    else
+        print_error "Cannot proceed without a valid /data mount directory."
+        exit 1
+    fi
+fi
+
+export DATA_DIR="$data_dir"
+print_status "Using '$data_dir' as /data mount"
+
+# Step 3: Stop any existing containers
 print_step "🛑 Stopping existing containers..."
 docker compose -f docker-compose.lima.yml down --remove-orphans || true
 
-# Step 3: Pull required images
+# Step 4: Pull required images
 print_step "📥 Pulling required images..."
 images=(
     "redis:latest"
@@ -92,19 +116,19 @@ for image in "${images[@]}"; do
     retry docker pull $image
 done
 
-# Step 4: Start services
+# Step 5: Start services
 print_step "🚀 Starting services with docker-compose..."
 docker compose -f docker-compose.lima.yml up -d
 
-# Step 5: Wait for services to be ready
+# Step 6: Wait for services to be ready
 print_step "⏳ Waiting for services to start..."
 sleep 10
 
-# Step 6: Check service status
+# Step 7: Check service status
 print_step "🔍 Checking service status..."
 docker compose -f docker-compose.lima.yml ps
 
-# Step 7: Show connection information
+# Step 8: Show connection information
 print_step "📋 Connection Information:"
 echo
 print_status "SSH into devenv container:"
@@ -119,11 +143,11 @@ echo "  Redpanda Admin: localhost:8084"
 echo
 print_status "Mounted volumes:"
 echo "  Host mono-root -> Container /mono-root"
-echo "  Host /data -> Container /data"
+echo "  Host $DATA_DIR -> Container /data"
 echo "  Host ~/.ssh -> Container /tmp/.ssh (read-only)"
 echo
 
-# Step 8: Show logs command
+# Step 9: Show logs command
 print_status "To view logs: docker compose -f docker-compose.lima.yml logs -f [service_name]"
 print_status "To stop all: docker compose -f docker-compose.lima.yml down"
 

@@ -21,7 +21,7 @@ services:
       - "2222:22"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /data:/data
+      - ${DATA_DIR:-/data}:/data
       - ../..:/mono-root
       - ~/.ssh:/tmp/.ssh:ro
       - /dev/net/tun:/dev/net/tun
