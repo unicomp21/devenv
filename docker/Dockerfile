@@ -345,7 +345,9 @@ ENV EM_CACHE=/emsdk/cache
 ENV EM_PORTS=/emsdk/ports
 ENV PATH="/emsdk:${PATH}"
 ENV PATH="/emsdk/upstream/emscripten:${PATH}"
-ENV PATH="/emsdk/node/15.14.0_64bit/bin:${PATH}"
+# Symlink emsdk's node to a fixed path to avoid hardcoding the version directory
+RUN NODE_BIN=$(find /emsdk/node -name "node" -maxdepth 5 -type f | sort | tail -1) && \
+    ln -sf "$NODE_BIN" /usr/local/bin/emsdk-node
 
 # Set the appropriate user (e.g., root)
 USER root

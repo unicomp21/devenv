@@ -1,0 +1,12 @@
+# Scripts and configs not needed in the build context
+lima-*.sh
+lima-lib.sh
+docker-compose*.yml
+haproxy.cfg
+nginx.conf
+.env
+.env.example
+.gitignore
+tmp/
+flutter/
+ipfs-data/
