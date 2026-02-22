@@ -12,7 +12,7 @@ RUN apt-get update && \
     # Base packages
     curl wget git build-essential openssh-server unzip python3 software-properties-common zip \
     locales libpcre3-dev zlib1g-dev libxt-dev apt-transport-https ca-certificates gnupg-agent \
-    openjdk-17-jdk emacs-nox \
+    openjdk-21-jdk emacs-nox \
     # Development tools
     protobuf-compiler libprotobuf-dev clang-format clang-tidy clang-tools clang clangd libc++-dev \
     libc++1 libc++abi-dev libc++abi1 libclang-dev libclang1 liblldb-dev libllvm-ocaml-dev \
@@ -24,7 +24,7 @@ RUN apt-get update && \
     # Linux AIO support
     libaio-dev libaio1t64 \
     # Additional tools
-    jq emacs-nox bsdmainutils \
+    jq emacs-nox bsdmainutils xxd \
     # Network tools for raw socket development
     tcpdump wireshark-common netcat-openbsd nmap hping3 \
     # Chrome for Flutter web development
@@ -47,7 +47,7 @@ RUN apt-get update && \
     dpkg -i packages-microsoft-prod.deb && \
     rm packages-microsoft-prod.deb && \
     apt-get update && \
-    apt-get install -y dotnet-runtime-8.0 dotnet-sdk-8.0 && \
+    apt-get install -y dotnet-runtime-9.0 dotnet-sdk-9.0 && \
     # Git LFS setup
     curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash && \
     apt-get update && \
@@ -55,6 +55,9 @@ RUN apt-get update && \
     git lfs install && \
     # Final cleanup
     rm -rf /var/lib/apt/lists/*
+
+# Restore full Ubuntu installation (man pages, documentation, etc.)
+RUN yes | unminimize
 
 RUN locale-gen en_US.UTF-8
 ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
@@ -90,7 +93,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
         (echo "Pre-built binaries failed, using build-deno.sh script..." && \
         cd /root/repo/dev && \
         ./build-deno.sh --dir ~/.deno)) \
-    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get install -y nodejs \
     && npm install -g npm@latest \
     && cargo install cargo-make \
@@ -140,7 +143,7 @@ RUN /root/.cargo/bin/rustup update \
 RUN echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
 
 # Install Golang with architecture detection
-ENV GOLANG_VERSION=1.24.2
+ENV GOLANG_VERSION=1.26
 ENV GOPATH=/go
 ENV GOROOT=/usr/local/go
 ENV PATH=$GOPATH/bin:$GOROOT/bin:$PATH
@@ -163,8 +166,8 @@ RUN echo 'export PATH=$GOPATH/bin:$GOROOT/bin:$PATH' >> ~/.bashrc
 # Create a temporary Go module and install Pion TURN and WebRTC
 WORKDIR /tmp/goinstall
 RUN go mod init temp-module \
-    && go get github.com/pion/turn/v2@v2.1.3 \
-    && go get github.com/pion/webrtc/v4@v4.0.0 \
+    && go get github.com/pion/turn/v4@latest \
+    && go get github.com/pion/webrtc/v4@v4.2.5 \
     && cp -R /go/pkg/mod/github.com/pion /usr/local/go/src/github.com/
 
 # Clean up
@@ -189,6 +192,21 @@ RUN ARCH=$(dpkg --print-architecture) && \
         echo "Unsupported architecture: $ARCH" && exit 1; \
     fi && \
     rm bun.zip
+
+# Install Flutter SDK with architecture detection
+ENV FLUTTER_HOME=/usr/local/flutter
+ENV PATH="${FLUTTER_HOME}/bin:${PATH}"
+RUN ARCH=$(dpkg --print-architecture) && \
+    FLUTTER_VERSION=$(curl -s https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json | jq -r '.current_release.stable') && \
+    FLUTTER_RELEASE=$(curl -s https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json | jq -r --arg version "$FLUTTER_VERSION" '.releases[] | select(.hash == $version) | .archive') && \
+    curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/${FLUTTER_RELEASE}" -o flutter.tar.xz && \
+    tar -xf flutter.tar.xz -C /usr/local && \
+    rm flutter.tar.xz && \
+    git config --global --add safe.directory /usr/local/flutter && \
+    flutter config --no-analytics && \
+    flutter precache
+
+RUN echo 'export PATH="/usr/local/flutter/bin:$PATH"' >> ~/.bashrc
 
 COPY entrypoint.sh /usr/local/bin/
 RUN echo 'export OPENAI_API_ENDPOINT=$OPENAI_API_ENDPOINT' >> ~/.bashrc \
@@ -328,7 +346,7 @@ RUN openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -
     && update-ca-certificates
 
 # Install Zig with architecture detection
-ENV ZIG_VERSION=0.14.0
+ENV ZIG_VERSION=0.15.2
 RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "amd64" ]; then \
         wget https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz && \
