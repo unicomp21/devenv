@@ -144,7 +144,7 @@ RUN /root/.cargo/bin/rustup update \
 RUN echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
 
 # Install Golang with architecture detection
-ENV GOLANG_VERSION=1.26
+ENV GOLANG_VERSION=1.26.0
 ENV GOPATH=/go
 ENV GOROOT=/usr/local/go
 ENV PATH=$GOPATH/bin:$GOROOT/bin:$PATH
