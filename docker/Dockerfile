@@ -121,9 +121,8 @@ RUN echo 'if [ -f ~/.bashrc ]; then . ~/.bashrc; fi' >> ~/.bash_profile \
 ENV CHROME_EXECUTABLE=/usr/bin/chromium-browser
 
 RUN mkdir /var/run/sshd \
-    && echo 'root:pwd' | chpasswd \
     && sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config \
-    && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+    && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 
 # Add this line to ensure the .ssh directory exists and has correct permissions
 RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh
