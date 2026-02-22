@@ -5,6 +5,8 @@ x-common-vars: &common-vars
   NATS_JS_ENDPOINT: "nats://nats:4222"
   NATS_WS_ENDPOINT: "ws://nats-ws:8081"
   REDIS_ENDPOINT: "redis://devenv-redis-1:6379"
+  GIT_USER_EMAIL: ""
+  GIT_USER_NAME: ""
 
 services:
   devenv:
@@ -17,6 +19,8 @@ services:
       NATS_JS_ENDPOINT: ${NATS_JS_ENDPOINT:-"nats://nats:4222"}
       NATS_WS_ENDPOINT: ${NATS_WS_ENDPOINT:-"ws://nats-ws:8081"}
       REDIS_ENDPOINT: ${REDIS_ENDPOINT:-"redis://devenv-redis-1:6379"}
+      GIT_USER_EMAIL: ${GIT_USER_EMAIL:-""}
+      GIT_USER_NAME: ${GIT_USER_NAME:-""}
     ports:
       - "2222:22"
     volumes:
