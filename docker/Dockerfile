@@ -212,6 +212,7 @@ RUN ARCH=$(dpkg --print-architecture) && \
     rm flutter.tar.xz && \
     git config --global --add safe.directory /usr/local/flutter && \
     flutter config --no-analytics && \
+    dart --disable-analytics && \
     flutter precache
 
 RUN echo 'export PATH="/usr/local/flutter/bin:$PATH"' >> ~/.bashrc
