@@ -197,8 +197,15 @@ RUN ARCH=$(dpkg --print-architecture) && \
 ENV FLUTTER_HOME=/usr/local/flutter
 ENV PATH="${FLUTTER_HOME}/bin:${PATH}"
 RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then \
+        FLUTTER_ARCH="x64"; \
+    elif [ "$ARCH" = "arm64" ]; then \
+        FLUTTER_ARCH="arm64"; \
+    else \
+        echo "Unsupported architecture: $ARCH" && exit 1; \
+    fi && \
     FLUTTER_VERSION=$(curl -s https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json | jq -r '.current_release.stable') && \
-    FLUTTER_RELEASE=$(curl -s https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json | jq -r --arg version "$FLUTTER_VERSION" '.releases[] | select(.hash == $version) | .archive') && \
+    FLUTTER_RELEASE=$(curl -s https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json | jq -r --arg version "$FLUTTER_VERSION" --arg arch "$FLUTTER_ARCH" '.releases[] | select(.hash == $version and .dart_sdk_arch == $arch) | .archive') && \
     curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/${FLUTTER_RELEASE}" -o flutter.tar.xz && \
     tar -xf flutter.tar.xz -C /usr/local && \
     rm flutter.tar.xz && \
@@ -272,16 +279,33 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --upgrade pip setuptools && \
     pip install certbot scapy
 
-# Install kubectl
-RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
-    && chmod +x kubectl \
-    && mv kubectl /usr/local/bin/
+# Install kubectl with architecture detection
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then \
+        KUBECTL_ARCH="amd64"; \
+    elif [ "$ARCH" = "arm64" ]; then \
+        KUBECTL_ARCH="arm64"; \
+    else \
+        echo "Unsupported architecture: $ARCH" && exit 1; \
+    fi && \
+    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${KUBECTL_ARCH}/kubectl" && \
+    chmod +x kubectl && \
+    mv kubectl /usr/local/bin/
 
 # Install Helm
 RUN curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
-# Install k9s
-RUN curl -sS https://webinstall.dev/k9s | bash
+# Install k9s with architecture detection
+RUN ARCH=$(dpkg --print-architecture) && \
+    K9S_VERSION=$(curl -s https://api.github.com/repos/derailed/k9s/releases/latest | jq -r '.tag_name') && \
+    if [ "$ARCH" = "amd64" ]; then \
+        K9S_ARCH="amd64"; \
+    elif [ "$ARCH" = "arm64" ]; then \
+        K9S_ARCH="arm64"; \
+    else \
+        echo "Unsupported architecture: $ARCH" && exit 1; \
+    fi && \
+    curl -fsSL "https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_${K9S_ARCH}.tar.gz" | tar xzf - -C /usr/local/bin k9s
 
 # Install Cursor Agent CLI and configure PATH
 RUN curl https://cursor.com/install -fsSL | bash
