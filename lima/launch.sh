@@ -18,9 +18,8 @@ if [ -z "$SSH_AUTH_SOCK" ]; then
     eval "$(ssh-agent -s)"
 fi
 
-# Clear any existing keys and add the ED25519 key
-ssh-add -D >/dev/null 2>&1 || true
-ssh-add ~/.ssh/id_ed25519
+# Add the ED25519 key if not already loaded
+ssh-add -l | grep -q "$(ssh-keygen -lf ~/.ssh/id_ed25519.pub 2>/dev/null | awk '{print $2}')" || ssh-add ~/.ssh/id_ed25519
 
 # Verify key is loaded
 if ! ssh-add -l | grep -q "ED25519"; then
@@ -166,10 +165,6 @@ provision:
       echo 'vm.vfs_cache_pressure=50' >> /etc/sysctl.conf
       sysctl -p
 
-      # Add newgrp command to user's bashrc to ensure docker group is active
-      echo 'if ! groups | grep -q docker; then' >> /home/$USER_NAME/.bashrc
-      echo '    newgrp docker' >> /home/$USER_NAME/.bashrc
-      echo 'fi' >> /home/$USER_NAME/.bashrc
 
       # Ensure /usr/local/bin is in PATH for user sessions
       echo 'export PATH="/usr/local/bin:$PATH"' >> /home/$USER_NAME/.bashrc

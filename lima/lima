@@ -3,7 +3,11 @@
 # Lima VM management script
 
 # Set LIMA_HOME to VM directory for all persistence concerns
-export LIMA_HOME="/Volumes/MacOS/Lima/VM"
+if [ -d "/Volumes/MacOS" ]; then
+    export LIMA_HOME="/Volumes/MacOS/Lima/VM"
+else
+    export LIMA_HOME="$HOME/.lima/VM"
+fi
 
 if [[ $# -eq 0 ]]; then
     echo "Lima VM Manager"
