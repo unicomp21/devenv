@@ -376,15 +376,15 @@ RUN openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -
 ENV ZIG_VERSION=0.15.2
 RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "amd64" ]; then \
-        wget https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz && \
-        tar -xf zig-linux-x86_64-${ZIG_VERSION}.tar.xz && \
-        mv zig-linux-x86_64-${ZIG_VERSION} /usr/local/zig && \
-        rm zig-linux-x86_64-${ZIG_VERSION}.tar.xz; \
+        wget https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz && \
+        tar -xf zig-x86_64-linux-${ZIG_VERSION}.tar.xz && \
+        mv zig-x86_64-linux-${ZIG_VERSION} /usr/local/zig && \
+        rm zig-x86_64-linux-${ZIG_VERSION}.tar.xz; \
     elif [ "$ARCH" = "arm64" ]; then \
-        wget https://ziglang.org/download/${ZIG_VERSION}/zig-linux-aarch64-${ZIG_VERSION}.tar.xz && \
-        tar -xf zig-linux-aarch64-${ZIG_VERSION}.tar.xz && \
-        mv zig-linux-aarch64-${ZIG_VERSION} /usr/local/zig && \
-        rm zig-linux-aarch64-${ZIG_VERSION}.tar.xz; \
+        wget https://ziglang.org/download/${ZIG_VERSION}/zig-aarch64-linux-${ZIG_VERSION}.tar.xz && \
+        tar -xf zig-aarch64-linux-${ZIG_VERSION}.tar.xz && \
+        mv zig-aarch64-linux-${ZIG_VERSION} /usr/local/zig && \
+        rm zig-aarch64-linux-${ZIG_VERSION}.tar.xz; \
     else \
         echo "Unsupported architecture: $ARCH" && exit 1; \
     fi
