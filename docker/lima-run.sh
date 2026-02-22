@@ -51,6 +51,19 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
+# Ensure docker group is active in this session
+if ! docker info &> /dev/null; then
+    if groups | grep -q docker 2>/dev/null || id -nG | grep -q docker 2>/dev/null; then
+        : # already in docker group but still failing - different issue
+    elif grep -q "docker.*$(whoami)" /etc/group 2>/dev/null; then
+        print_warning "Docker group not active in this session. Re-executing with docker group..."
+        exec sg docker -c "$0 $*"
+    else
+        print_error "User $(whoami) is not in the docker group. Run: sudo usermod -aG docker $(whoami)"
+        exit 1
+    fi
+fi
+
 # Check if we're in the correct directory
 if [[ ! -f "Dockerfile" ]]; then
     print_error "Dockerfile not found. Please run this script from the docker/devenv directory."

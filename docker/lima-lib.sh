@@ -35,6 +35,16 @@ check_docker() {
         print_error "Docker not found. Make sure you're running this in the Lima VM."
         exit 1
     fi
+    # Ensure docker group is active in this session
+    if ! docker info &> /dev/null; then
+        if grep -q "docker.*$(whoami)" /etc/group 2>/dev/null; then
+            print_warning "Docker group not active in this session. Re-executing with docker group..."
+            exec sg docker -c "$0 $*"
+        else
+            print_error "User $(whoami) is not in the docker group. Run: sudo usermod -aG docker $(whoami)"
+            exit 1
+        fi
+    fi
 }
 
 check_dockerfile() {
