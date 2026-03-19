@@ -199,10 +199,13 @@ RUN ARCH=$(dpkg --print-architecture) && \
 # Install Flutter SDK via git (avoids fragile releases JSON parsing)
 ENV FLUTTER_HOME=/usr/local/flutter
 ENV PATH="${FLUTTER_HOME}/bin:${PATH}"
+# Suppress analytics at the env level (covers runtime invocations too)
+ENV FLUTTER_SUPPRESS_ANALYTICS=true
+ENV DART_CLI_ANALYTICS=false
 RUN git clone https://github.com/flutter/flutter.git -b stable --depth 1 /usr/local/flutter && \
     git config --global --add safe.directory /usr/local/flutter && \
     flutter config --no-analytics && \
-    dart --disable-analytics && \
+    dart analytics disable && \
     flutter precache
 
 RUN echo 'export PATH="/usr/local/flutter/bin:$PATH"' >> ~/.bashrc
