@@ -206,7 +206,7 @@ RUN git clone https://github.com/flutter/flutter.git -b stable --depth 1 /usr/lo
     git config --global --add safe.directory /usr/local/flutter && \
     flutter config --no-analytics && \
     dart analytics disable && \
-    flutter precache
+    flutter precache --linux --web
 
 RUN echo 'export PATH="/usr/local/flutter/bin:$PATH"' >> ~/.bashrc
 
