@@ -196,22 +196,10 @@ RUN ARCH=$(dpkg --print-architecture) && \
     fi && \
     rm bun.zip
 
-# Install Flutter SDK with architecture detection
+# Install Flutter SDK via git (avoids fragile releases JSON parsing)
 ENV FLUTTER_HOME=/usr/local/flutter
 ENV PATH="${FLUTTER_HOME}/bin:${PATH}"
-RUN ARCH=$(dpkg --print-architecture) && \
-    if [ "$ARCH" = "amd64" ]; then \
-        FLUTTER_ARCH="x64"; \
-    elif [ "$ARCH" = "arm64" ]; then \
-        FLUTTER_ARCH="arm64"; \
-    else \
-        echo "Unsupported architecture: $ARCH" && exit 1; \
-    fi && \
-    FLUTTER_VERSION=$(curl -s https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json | jq -r '.current_release.stable') && \
-    FLUTTER_RELEASE=$(curl -s https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json | jq -r --arg version "$FLUTTER_VERSION" --arg arch "$FLUTTER_ARCH" '.releases[] | select(.hash == $version and .dart_sdk_arch == $arch) | .archive') && \
-    curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/${FLUTTER_RELEASE}" -o flutter.tar.xz && \
-    tar -xf flutter.tar.xz -C /usr/local && \
-    rm flutter.tar.xz && \
+RUN git clone https://github.com/flutter/flutter.git -b stable --depth 1 /usr/local/flutter && \
     git config --global --add safe.directory /usr/local/flutter && \
     flutter config --no-analytics && \
     dart --disable-analytics && \
