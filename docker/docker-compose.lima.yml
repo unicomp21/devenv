@@ -27,7 +27,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${DATA_DIR:-/data}:/data
       - ../..:/mono-root
-      - ~/.ssh:/tmp/.ssh:ro
+      - ${SSH_HOME:-/Users/jdavis}/.ssh:/tmp/.ssh:ro
       - /dev/net/tun:/dev/net/tun
       - /dev/net:/dev/net
     user: "root:root"

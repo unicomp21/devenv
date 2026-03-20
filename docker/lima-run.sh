@@ -45,6 +45,7 @@ if [[ ! -d "$data_dir" ]]; then
 fi
 
 export DATA_DIR="$data_dir"
+export SSH_HOME="/Users/jdavis"
 print_status "Using '$data_dir' as /data mount"
 
 # Step 3: Stop any existing containers

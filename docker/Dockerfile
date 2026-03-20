@@ -29,8 +29,6 @@ RUN apt-get update && \
     jq emacs-nox bsdmainutils xxd \
     # Network tools for raw socket development
     tcpdump wireshark-common netcat-openbsd nmap hping3 \
-    # Chrome for Flutter web development
-    chromium-browser \
     # Mesa utilities for eglinfo
     mesa-utils && \
     # Architecture-specific packages
@@ -121,9 +119,6 @@ RUN echo 'if [ -f ~/.bashrc ]; then . ~/.bashrc; fi' >> ~/.bash_profile \
     && echo "alias python=python3" >> ~/.bashrc \
     && echo "alias emacs='emacs -nw'" >> ~/.bashrc
 
-# Set Chrome executable for Flutter
-ENV CHROME_EXECUTABLE=/usr/bin/chromium-browser
-
 RUN mkdir /var/run/sshd \
     && sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config \
     && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
@@ -195,20 +190,6 @@ RUN ARCH=$(dpkg --print-architecture) && \
         echo "Unsupported architecture: $ARCH" && exit 1; \
     fi && \
     rm bun.zip
-
-# Install Flutter SDK via git (avoids fragile releases JSON parsing)
-ENV FLUTTER_HOME=/usr/local/flutter
-ENV PATH="${FLUTTER_HOME}/bin:${PATH}"
-# Suppress analytics at the env level (covers runtime invocations too)
-ENV FLUTTER_SUPPRESS_ANALYTICS=true
-ENV DART_CLI_ANALYTICS=false
-RUN git clone https://github.com/flutter/flutter.git -b stable --depth 1 /usr/local/flutter && \
-    git config --global --add safe.directory /usr/local/flutter && \
-    flutter config --no-analytics && \
-    dart --disable-analytics && \
-    flutter precache --linux --web
-
-RUN echo 'export PATH="/usr/local/flutter/bin:$PATH"' >> ~/.bashrc
 
 COPY entrypoint.sh /usr/local/bin/
 RUN echo 'export OPENAI_API_ENDPOINT=$OPENAI_API_ENDPOINT' >> ~/.bashrc \

@@ -6,6 +6,9 @@ if [ -d /tmp/.ssh ]; then
   cp -r /tmp/.ssh/* /root/.ssh/
   chmod 700 /root/.ssh
   chmod 600 /root/.ssh/*
+  # Build authorized_keys from any public keys present
+  cat /root/.ssh/*.pub >> /root/.ssh/authorized_keys 2>/dev/null
+  chmod 600 /root/.ssh/authorized_keys
 fi
 
 # Fix for SSH prompt directory syncing
