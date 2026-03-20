@@ -205,7 +205,7 @@ ENV DART_CLI_ANALYTICS=false
 RUN git clone https://github.com/flutter/flutter.git -b stable --depth 1 /usr/local/flutter && \
     git config --global --add safe.directory /usr/local/flutter && \
     flutter config --no-analytics && \
-    dart analytics disable && \
+    dart --disable-analytics && \
     flutter precache --linux --web
 
 RUN echo 'export PATH="/usr/local/flutter/bin:$PATH"' >> ~/.bashrc
