@@ -156,7 +156,7 @@ provision:
       ls -la /usr/local/bin/deno
 
       # Create 32GB swap file
-      fallocate -l 32G /swapfile
+      fallocate -l 64G /swapfile
       chmod 600 /swapfile
       mkswap /swapfile
       swapon /swapfile
