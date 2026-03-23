@@ -24,6 +24,7 @@ CHROME_USER_DATA="${CHROME_USER_DATA:-/tmp/chrome-cdp-profile}"
 MODE="lan"   # default: direct LAN access
 CHROME_PID=""
 SOCAT_PID=""
+SOCAT2_PID=""
 TUNNEL_PID=""
 TUNNEL_LOG=""
 
@@ -41,7 +42,6 @@ detect_chrome() {
                 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
                 "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary"
                 "/Applications/Chromium.app/Contents/MacOS/Chromium"
-                "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
                 "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
             )
             for c in "${candidates[@]}"; do
@@ -52,7 +52,7 @@ detect_chrome() {
             done
             ;;
         Linux)
-            for c in google-chrome google-chrome-stable chromium-browser chromium brave-browser microsoft-edge; do
+            for c in google-chrome google-chrome-stable chromium-browser chromium microsoft-edge; do
                 if command -v "$c" &>/dev/null; then
                     CHROME_BIN="$(command -v "$c")"
                     break
@@ -80,6 +80,7 @@ cleanup() {
     echo "Shutting down..."
     [[ -n "$CHROME_PID" ]]  && kill "$CHROME_PID"  2>/dev/null && echo "  stopped chrome  (pid $CHROME_PID)"
     [[ -n "$SOCAT_PID" ]]   && kill "$SOCAT_PID"   2>/dev/null && echo "  stopped socat   (pid $SOCAT_PID)"
+    [[ -n "$SOCAT2_PID" ]]  && kill "$SOCAT2_PID"  2>/dev/null && echo "  stopped socat   (pid $SOCAT2_PID)"
     [[ -n "$TUNNEL_PID" ]]  && kill "$TUNNEL_PID"  2>/dev/null && echo "  stopped tunnel  (pid $TUNNEL_PID)"
     [[ -n "$TUNNEL_LOG" ]]  && rm -f "$TUNNEL_LOG"
     wait 2>/dev/null
@@ -199,9 +200,17 @@ start_socat_proxy() {
         return 1
     fi
 
-    echo "Chrome bound to 127.0.0.1 only — starting socat proxy on 0.0.0.0:${SOCAT_PORT} ..."
+    local lan_ip
+    lan_ip=$(detect_lan_ip)
+
+    echo "Chrome bound to 127.0.0.1 only — starting socat proxies..."
     ensure_socat
 
+    # Proxy debug port on LAN IP so clients can use the standard CDP_PORT
+    socat TCP-LISTEN:"$CDP_PORT",bind="$lan_ip",fork,reuseaddr TCP:127.0.0.1:"$CDP_PORT" &
+    SOCAT2_PID=$!
+
+    # Catch-all proxy on 0.0.0.0:SOCAT_PORT for Docker bridge networks, etc.
     socat TCP-LISTEN:"$SOCAT_PORT",bind=0.0.0.0,fork,reuseaddr TCP:127.0.0.1:"$CDP_PORT" &
     SOCAT_PID=$!
 
@@ -211,6 +220,7 @@ start_socat_proxy() {
         echo "Error: socat exited immediately. Is port ${SOCAT_PORT} in use?" >&2
         exit 1
     fi
+    echo "socat proxy ready (${lan_ip}:${CDP_PORT} → 127.0.0.1:${CDP_PORT})"
     echo "socat proxy ready (0.0.0.0:${SOCAT_PORT} → 127.0.0.1:${CDP_PORT})"
     return 0
 }
@@ -282,12 +292,9 @@ print_info_lan() {
     version_json=$(curl -sf "http://127.0.0.1:${CDP_PORT}/json/version")
     ws_path=$(echo "$version_json" | sed -n 's|.*"webSocketDebuggerUrl"[[:space:]]*:[[:space:]]*"ws://[^/]*/\(.*\)".*|\1|p')
 
-    # If socat proxy is active, external connections use SOCAT_PORT
-    if [[ -n "$SOCAT_PID" ]]; then
-        ext_port="$SOCAT_PORT"
-    else
-        ext_port="$CDP_PORT"
-    fi
+    # If socat proxy is active, LAN_IP:CDP_PORT works directly;
+    # SOCAT_PORT on 0.0.0.0 is available as a fallback for Docker bridges etc.
+    ext_port="$CDP_PORT"
 
     cat <<EOF
 
@@ -302,7 +309,8 @@ EOF
 
     if [[ -n "$SOCAT_PID" ]]; then
         cat <<EOF
-  Proxy:     socat 0.0.0.0:${ext_port} → 127.0.0.1:${CDP_PORT}
+  Proxy:     socat ${host_ip}:${CDP_PORT} → 127.0.0.1:${CDP_PORT}
+             socat 0.0.0.0:${SOCAT_PORT} → 127.0.0.1:${CDP_PORT}
              (browser ignored --remote-debugging-address)
 EOF
     fi
