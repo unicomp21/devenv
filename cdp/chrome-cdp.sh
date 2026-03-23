@@ -16,11 +16,14 @@ set -euo pipefail
 #   CDP_BIND          Bind address                 (default: 0.0.0.0 for --lan, 127.0.0.1 for --tunnel)
 #   CHROME_USER_DATA  Separate profile directory   (default: /tmp/chrome-cdp-profile)
 #   CHROME_BIN        Override Chrome binary path
+#   SOCAT_PORT        External-facing port for socat proxy (default: CDP_PORT + 1 = 9223)
 
 CDP_PORT="${CDP_PORT:-9222}"
+SOCAT_PORT="${SOCAT_PORT:-$((CDP_PORT + 1))}"
 CHROME_USER_DATA="${CHROME_USER_DATA:-/tmp/chrome-cdp-profile}"
 MODE="lan"   # default: direct LAN access
 CHROME_PID=""
+SOCAT_PID=""
 TUNNEL_PID=""
 TUNNEL_LOG=""
 
@@ -76,6 +79,7 @@ cleanup() {
     echo ""
     echo "Shutting down..."
     [[ -n "$CHROME_PID" ]]  && kill "$CHROME_PID"  2>/dev/null && echo "  stopped chrome  (pid $CHROME_PID)"
+    [[ -n "$SOCAT_PID" ]]   && kill "$SOCAT_PID"   2>/dev/null && echo "  stopped socat   (pid $SOCAT_PID)"
     [[ -n "$TUNNEL_PID" ]]  && kill "$TUNNEL_PID"  2>/dev/null && echo "  stopped tunnel  (pid $TUNNEL_PID)"
     [[ -n "$TUNNEL_LOG" ]]  && rm -f "$TUNNEL_LOG"
     wait 2>/dev/null
@@ -143,6 +147,74 @@ launch_chrome() {
     exit 1
 }
 
+# ── Ensure socat is available ────────────────────────────────────────────────
+
+ensure_socat() {
+    command -v socat &>/dev/null && return 0
+
+    echo "socat not found — installing..."
+    case "$(uname -s)" in
+        Darwin)
+            if command -v brew &>/dev/null; then
+                brew install socat
+            else
+                echo "Error: socat not found and Homebrew is not installed." >&2
+                echo "  Install Homebrew (https://brew.sh) then: brew install socat" >&2
+                exit 1
+            fi
+            ;;
+        Linux)
+            if command -v apt-get &>/dev/null; then
+                sudo apt-get update -qq && sudo apt-get install -yqq socat
+            elif command -v dnf &>/dev/null; then
+                sudo dnf install -y socat
+            elif command -v pacman &>/dev/null; then
+                sudo pacman -S --noconfirm socat
+            elif command -v apk &>/dev/null; then
+                sudo apk add --no-cache socat
+            else
+                echo "Error: socat not found and no known package manager available." >&2
+                exit 1
+            fi
+            ;;
+    esac
+
+    if ! command -v socat &>/dev/null; then
+        echo "Error: socat installation failed." >&2
+        exit 1
+    fi
+    echo "socat installed."
+}
+
+# ── Start socat proxy (workaround for browsers that ignore bind address) ────
+
+start_socat_proxy() {
+    # Check if Chrome actually bound to the requested address
+    local actual_bind
+    actual_bind=$(lsof -iTCP:"$CDP_PORT" -sTCP:LISTEN -n -P 2>/dev/null \
+        | awk 'NR>1 {print $9}' | head -1 | cut -d: -f1 || true)
+
+    if [[ "$actual_bind" != "127.0.0.1" ]]; then
+        # Chrome honoured the bind address — no proxy needed
+        return 1
+    fi
+
+    echo "Chrome bound to 127.0.0.1 only — starting socat proxy on 0.0.0.0:${SOCAT_PORT} ..."
+    ensure_socat
+
+    socat TCP-LISTEN:"$SOCAT_PORT",bind=0.0.0.0,fork,reuseaddr TCP:127.0.0.1:"$CDP_PORT" &
+    SOCAT_PID=$!
+
+    # Brief check that socat started
+    sleep 0.3
+    if ! kill -0 "$SOCAT_PID" 2>/dev/null; then
+        echo "Error: socat exited immediately. Is port ${SOCAT_PORT} in use?" >&2
+        exit 1
+    fi
+    echo "socat proxy ready (0.0.0.0:${SOCAT_PORT} → 127.0.0.1:${CDP_PORT})"
+    return 0
+}
+
 # ── Start Cloudflare quick tunnel ────────────────────────────────────────────
 
 start_tunnel() {
@@ -205,10 +277,17 @@ detect_lan_ip() {
 # ── Print connection info ────────────────────────────────────────────────────
 
 print_info_lan() {
-    local host_ip version_json ws_path
+    local host_ip version_json ws_path ext_port
     host_ip=$(detect_lan_ip)
     version_json=$(curl -sf "http://127.0.0.1:${CDP_PORT}/json/version")
     ws_path=$(echo "$version_json" | sed -n 's|.*"webSocketDebuggerUrl"[[:space:]]*:[[:space:]]*"ws://[^/]*/\(.*\)".*|\1|p')
+
+    # If socat proxy is active, external connections use SOCAT_PORT
+    if [[ -n "$SOCAT_PID" ]]; then
+        ext_port="$SOCAT_PORT"
+    else
+        ext_port="$CDP_PORT"
+    fi
 
     cat <<EOF
 
@@ -218,32 +297,42 @@ print_info_lan() {
 
   Host IP:   ${host_ip}
   Local:     http://127.0.0.1:${CDP_PORT}
-  LAN:       http://${host_ip}:${CDP_PORT}
+  LAN:       http://${host_ip}:${ext_port}
+EOF
+
+    if [[ -n "$SOCAT_PID" ]]; then
+        cat <<EOF
+  Proxy:     socat 0.0.0.0:${ext_port} → 127.0.0.1:${CDP_PORT}
+             (browser ignored --remote-debugging-address)
+EOF
+    fi
+
+    cat <<EOF
 
   Endpoints (from container/VM)
-    version:   http://${host_ip}:${CDP_PORT}/json/version
-    targets:   http://${host_ip}:${CDP_PORT}/json/list
-    websocket: ws://${host_ip}:${CDP_PORT}/${ws_path}
+    version:   http://${host_ip}:${ext_port}/json/version
+    targets:   http://${host_ip}:${ext_port}/json/list
+    websocket: ws://${host_ip}:${ext_port}/${ws_path}
 
   Playwright (from container)
     const browser = await chromium.connectOverCDP(
-      'http://${host_ip}:${CDP_PORT}'
+      'http://${host_ip}:${ext_port}'
     );
 
   Puppeteer (from container)
     const browser = await puppeteer.connect({
-      browserURL: 'http://${host_ip}:${CDP_PORT}'
+      browserURL: 'http://${host_ip}:${ext_port}'
     });
 
   Docker run example
     docker run --rm \\
-      -e CDP_ENDPOINT=http://${host_ip}:${CDP_PORT} \\
+      -e CDP_ENDPOINT=http://${host_ip}:${ext_port} \\
       your-test-image
 
   Lima VM note
     The host IP ${host_ip} is reachable from Lima's
     default network. From inside the VM/container:
-      curl http://${host_ip}:${CDP_PORT}/json/version
+      curl http://${host_ip}:${ext_port}/json/version
 
 ════════════════════════════════════════════════
   Ctrl+C to stop
@@ -308,6 +397,8 @@ main() {
         start_tunnel
         print_info_tunnel
     else
+        # If Chrome ignored the bind address, auto-start a socat proxy
+        start_socat_proxy || true
         print_info_lan
     fi
 
