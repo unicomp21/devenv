@@ -115,8 +115,9 @@ launch_chrome() {
 
         # GPU / WebGPU — use real hardware by default
         --enable-gpu
-        --enable-features=Vulkan,UseSkiaRenderer,WebGPU
+        --enable-features=Vulkan,UseSkiaRenderer
         --enable-unsafe-webgpu
+        --ignore-gpu-blocklist
         --disable-gpu-sandbox
 
         "$@"
