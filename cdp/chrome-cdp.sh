@@ -1,20 +1,25 @@
 #!/bin/bash
 set -euo pipefail
 
-# Chrome CDP + Cloudflare Tunnel for Remote Test Automation
-# Launches Chrome with desktop GUI, enables CDP, proxies via cloudflared.
+# Chrome CDP for Remote Test Automation
+# Launches Chrome with desktop GUI + CDP, accessible from Docker/Lima/LAN.
 # Works on macOS and Linux.
 #
 # Usage:
-#   ./chrome-cdp.sh [-- extra-chrome-flags...]
+#   ./chrome-cdp.sh [--lan|--tunnel] [-- extra-chrome-flags...]
+#
+#   --lan      Bind CDP to 0.0.0.0 for direct LAN/VM access (default)
+#   --tunnel   Proxy CDP through a cloudflared quick tunnel
 #
 # Environment:
 #   CDP_PORT          CDP listening port           (default: 9222)
+#   CDP_BIND          Bind address                 (default: 0.0.0.0 for --lan, 127.0.0.1 for --tunnel)
 #   CHROME_USER_DATA  Separate profile directory   (default: /tmp/chrome-cdp-profile)
 #   CHROME_BIN        Override Chrome binary path
 
 CDP_PORT="${CDP_PORT:-9222}"
 CHROME_USER_DATA="${CHROME_USER_DATA:-/tmp/chrome-cdp-profile}"
+MODE="lan"   # default: direct LAN access
 CHROME_PID=""
 TUNNEL_PID=""
 TUNNEL_LOG=""
@@ -82,9 +87,19 @@ trap cleanup EXIT
 launch_chrome() {
     mkdir -p "$CHROME_USER_DATA"
 
+    # Determine bind address
+    local bind_addr
+    if [[ -n "${CDP_BIND:-}" ]]; then
+        bind_addr="$CDP_BIND"
+    elif [[ "$MODE" == "lan" ]]; then
+        bind_addr="0.0.0.0"
+    else
+        bind_addr="127.0.0.1"
+    fi
+
     local flags=(
         --remote-debugging-port="$CDP_PORT"
-        --remote-debugging-address=127.0.0.1
+        --remote-debugging-address="$bind_addr"
         --user-data-dir="$CHROME_USER_DATA"
         --no-first-run
         --no-default-browser-check
@@ -92,6 +107,13 @@ launch_chrome() {
         --disable-backgrounding-occluded-windows
         --disable-renderer-backgrounding
         --disable-hang-monitor
+
+        # GPU / WebGPU — use real hardware by default
+        --enable-gpu
+        --enable-features=Vulkan,UseSkiaRenderer,WebGPU
+        --enable-unsafe-webgpu
+        --disable-gpu-sandbox
+
         "$@"
     )
 
@@ -162,19 +184,84 @@ start_tunnel() {
     exit 1
 }
 
+# ── Detect host LAN IP ───────────────────────────────────────────────────────
+
+detect_lan_ip() {
+    case "$(uname -s)" in
+        Darwin)
+            # Primary interface IP (works for Wi-Fi and Ethernet)
+            ipconfig getifaddr en0 2>/dev/null \
+                || ipconfig getifaddr en1 2>/dev/null \
+                || echo "127.0.0.1"
+            ;;
+        Linux)
+            hostname -I 2>/dev/null | awk '{print $1}' \
+                || ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}' \
+                || echo "127.0.0.1"
+            ;;
+    esac
+}
+
 # ── Print connection info ────────────────────────────────────────────────────
 
-print_info() {
+print_info_lan() {
+    local host_ip version_json ws_path
+    host_ip=$(detect_lan_ip)
+    version_json=$(curl -sf "http://127.0.0.1:${CDP_PORT}/json/version")
+    ws_path=$(echo "$version_json" | sed -n 's|.*"webSocketDebuggerUrl"[[:space:]]*:[[:space:]]*"ws://[^/]*/\(.*\)".*|\1|p')
+
+    cat <<EOF
+
+════════════════════════════════════════════════
+  Chrome CDP — LAN mode
+════════════════════════════════════════════════
+
+  Host IP:   ${host_ip}
+  Local:     http://127.0.0.1:${CDP_PORT}
+  LAN:       http://${host_ip}:${CDP_PORT}
+
+  Endpoints (from container/VM)
+    version:   http://${host_ip}:${CDP_PORT}/json/version
+    targets:   http://${host_ip}:${CDP_PORT}/json/list
+    websocket: ws://${host_ip}:${CDP_PORT}/${ws_path}
+
+  Playwright (from container)
+    const browser = await chromium.connectOverCDP(
+      'http://${host_ip}:${CDP_PORT}'
+    );
+
+  Puppeteer (from container)
+    const browser = await puppeteer.connect({
+      browserURL: 'http://${host_ip}:${CDP_PORT}'
+    });
+
+  Docker run example
+    docker run --rm \\
+      -e CDP_ENDPOINT=http://${host_ip}:${CDP_PORT} \\
+      your-test-image
+
+  Lima VM note
+    The host IP ${host_ip} is reachable from Lima's
+    default network. From inside the VM/container:
+      curl http://${host_ip}:${CDP_PORT}/json/version
+
+════════════════════════════════════════════════
+  Ctrl+C to stop
+════════════════════════════════════════════════
+
+EOF
+}
+
+print_info_tunnel() {
     local version_json ws_path tunnel_host
     version_json=$(curl -sf "http://127.0.0.1:${CDP_PORT}/json/version")
-    # Extract the path portion of the browser websocket debugger URL
     ws_path=$(echo "$version_json" | sed -n 's|.*"webSocketDebuggerUrl"[[:space:]]*:[[:space:]]*"ws://[^/]*/\(.*\)".*|\1|p')
     tunnel_host="${TUNNEL_URL#https://}"
 
     cat <<EOF
 
 ════════════════════════════════════════════════
-  Chrome CDP via Cloudflare Tunnel
+  Chrome CDP — Cloudflare Tunnel mode
 ════════════════════════════════════════════════
 
   Tunnel:    ${TUNNEL_URL}
@@ -203,10 +290,12 @@ EOF
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 main() {
-    # Split on -- so users can pass extra Chrome flags
+    # Parse options, split on -- for extra Chrome flags
     local chrome_extra=()
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            --lan)    MODE="lan";    shift ;;
+            --tunnel) MODE="tunnel"; shift ;;
             --) shift; chrome_extra=("$@"); break ;;
             *)  echo "Unknown option: $1" >&2; exit 1 ;;
         esac
@@ -214,8 +303,13 @@ main() {
 
     detect_chrome
     launch_chrome ${chrome_extra[@]+"${chrome_extra[@]}"}
-    start_tunnel
-    print_info
+
+    if [[ "$MODE" == "tunnel" ]]; then
+        start_tunnel
+        print_info_tunnel
+    else
+        print_info_lan
+    fi
 
     # Block until Chrome exits
     wait "$CHROME_PID" 2>/dev/null || true
