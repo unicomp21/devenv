@@ -284,7 +284,7 @@ RUN ARCH=$(dpkg --print-architecture) && \
     curl -fsSL "https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_${K9S_ARCH}.tar.gz" | tar xzf - -C /usr/local/bin k9s
 
 # Install Claude Code CLI
-RUN curl -fsSL https://claude.ai/install.sh | bash
+RUN npm install -g @anthropic-ai/claude-code
 
 # Configure system for linux/aio support
 # Increase aio-max-nr for better async I/O performance
