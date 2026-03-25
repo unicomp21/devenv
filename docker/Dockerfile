@@ -283,11 +283,6 @@ RUN ARCH=$(dpkg --print-architecture) && \
     fi && \
     curl -fsSL "https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_${K9S_ARCH}.tar.gz" | tar xzf - -C /usr/local/bin k9s
 
-# Install Cursor Agent CLI and configure PATH
-RUN curl https://cursor.com/install -fsSL | bash
-ENV PATH="/root/.local/bin:${PATH}"
-RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> /root/.bashrc && /bin/bash -lc "source /root/.bashrc"
-
 # Install Claude Code CLI
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
