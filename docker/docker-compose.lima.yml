@@ -21,8 +21,11 @@ services:
       REDIS_ENDPOINT: ${REDIS_ENDPOINT:-"redis://devenv-redis-1:6379"}
       GIT_USER_EMAIL: ${GIT_USER_EMAIL:-""}
       GIT_USER_NAME: ${GIT_USER_NAME:-""}
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
     ports:
       - "2222:22"
+    gpus: all
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${DATA_DIR:-/data}:/data
@@ -104,4 +107,4 @@ services:
 
 networks:
   devenv-network:
-    driver: bridge 
+    driver: bridge
